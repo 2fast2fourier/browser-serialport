@@ -141,12 +141,12 @@ function SerialPort(path, options, openImmediately, callback) {
   this.options = convertOptions(options);
 
   this.options.serial.onReceiveError.addListener(function(info){
+    console.log('ser-err', self.connectionId, info);
 
     switch (info.error) {
 
       case 'disconnected':
       case 'device_lost':
-      case 'system_error':
         err = new Error('Disconnected');
         // send notification of disconnect
         if (self.options.disconnectedCallback) {
@@ -156,6 +156,27 @@ function SerialPort(path, options, openImmediately, callback) {
         }
         if(self.connectionId >= 0){
           self.close();
+        }
+        break;
+      case 'system_error':
+        if(self.connectionId >= 0){
+          self.options.serial.getInfo(self.connectionId, function(info){
+            console.log('err-info', self.connectionId, info);
+            if(info.paused){
+              self.options.serial.setPaused(self.connectionId, false, function(){
+                console.log('ser-unpaused', self.connectionId);
+              });
+            }else{
+              err = new Error('Disconnected');
+              // send notification of disconnect
+              if (self.options.disconnectedCallback) {
+                self.options.disconnectedCallback(err);
+              } else {
+                self.emit('disconnect', err);
+              }
+              self.close();
+            }
+          });
         }
         break;
       case 'timeout':
